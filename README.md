@@ -25,4 +25,5 @@ node index.js
 - nano index.js (masukin script index js)
 - npm start
 - scan kode qr
-- Sekiam dri saya mohon maaf jika ada error
+- jika sudah terhubung maka tes dengan command .ping jika berhasil bot akan membalas pong
+- sekian gomenne kalo masih ada error nya
