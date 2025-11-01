@@ -29,7 +29,7 @@ async function startBot() {
     fs.writeFileSync("./jadwal.json", JSON.stringify({
       aktif: true,
       data: {
-        "Senin": ["08.00-10.30 Aplikasi Komputer", "10.30-13.00 Administrasi Sistem", "13.50-15.00 Bahasa I>
+        "Senin": ["08.00-10.30 Aplikasi Komputer", "10.30-13.00 Administrasi Sistem", "13.50-15.00 Bahasa Inggris"],
         "Selasa": ["13.50-15.30 Algoritma Pemrograman", "15.30-16.20 Praktikum Algoritma Pemrograman"],
         "Rabu": ["08.00-09.40 Agama", "15.30-17.10 Pancasila"],
         "Kamis": ["08.00-10.30 Kalkulus", "10.30-13.00 Jaringan Komputer Dasar"]
@@ -54,6 +54,15 @@ async function startBot() {
     fs.writeFileSync("./tugas.json", JSON.stringify(tugas, null, 2))
   }
 
+  // ====== FILE CONFIG UNTUK KOTA SHOLAT ======
+  if (!fs.existsSync("./config.json")) {
+    fs.writeFileSync("./config.json", JSON.stringify({ kota: "Meulaboh" }, null, 2))
+  }
+  let config = JSON.parse(fs.readFileSync("./config.json"))
+  function saveConfig() {
+    fs.writeFileSync("./config.json", JSON.stringify(config, null, 2))
+  }
+
   // ====== FORMAT JADWAL ======
   function formatJadwal() {
     let teks = "🎓 *JADWAL KULIAH*\n\n"
@@ -67,14 +76,14 @@ async function startBot() {
   }
 
   // ====== FORMAT TUGAS ======
- function formatTugas() {
-  if (tugas.data.length === 0) return "✅ Tidak ada tugas tersimpan."
-  let teks = "📚 *DAFTAR TUGAS*\n\n"
-  tugas.data.forEach((t, i) => {
-    teks += `${i + 1}. ${t.nama}\n🕒 Deadline: ${t.deadline}\n\n`
-  })
-  return teks
-}
+  function formatTugas() {
+    if (!tugas.data || tugas.data.length === 0) return "✅ Tidak ada tugas tersimpan."
+    let teks = "📚 *DAFTAR TUGAS*\n\n"
+    tugas.data.forEach((t, i) => {
+      teks += `${i + 1}. ${t.nama}\n🕒 Deadline: ${t.deadline}\n\n`
+    })
+    return teks
+  }
 
   // ====== HANDLE PESAN ======
   sock.ev.on("messages.upsert", async ({ messages }) => {
@@ -98,145 +107,129 @@ async function startBot() {
       const jam = d.toLocaleTimeString("id-ID", { hour12: false })
       return { hari: `${day} ${pasaranHari}`, tanggal, jam }
     }
-switch (cmd) {
+
+    switch (cmd) {
+      case "jid": {
+        await sock.sendMessage(from, { text: `🆔 ID Grup ini:\n${from}` })
+      } break
+
       case "menu": {
         const waktu = formatTanggal()
         await sock.sendMessage(from, {
           image: { url: "./menu.jpg" },
           caption: `
- 🛡Alycia Bot
-│ 🧜 𝗡𝗔𝗠𝗔       : ${sender}
-│ 🛠  𝗕𝗢𝗧        : Alycia Clarissa
-│ 👑 𝗢𝗪𝗡𝗘𝗥      : Yuki
-│ ⚙️  𝗩𝗘𝗥𝗦       : 1.0.0
-│ 📸 𝗦𝗧𝗔𝗧𝗨𝗦     : public
-│ 🗓  𝗛𝗔𝗥𝗜       : ${waktu.hari}
-│ 📆 𝗧𝗔𝗡𝗚𝗚𝗔𝗟    : ${waktu.tanggal}
-│ ⏳️ 𝗝𝗔𝗠        : ${waktu.jam}
+🛡 Alycia Bot
+│ 🧜 Nama: ${sender}
+│ 👑 Owner: Yuki
+│ ⚙️ Versi: 1.0.0
+│ 📆 Hari: ${waktu.hari}
+│ 🗓️ Tanggal: ${waktu.tanggal}
+│ ⏰ Jam: ${waktu.jam}
 
-
-🛡 *Alycia Menu list*
+🛡 *Alycia Menu List*
 
 • .ping
 • .jadwalkuliah
 • .editjadwal
 • .hapusjadwal
 • .jadwalon / .jadwaloff
-• .tugas / .edittugas / .hapustugas
+• .tugas / .tambahtugas / .edittugas / .hapustugas
 • .tugason / .tugasoff
 • .shalat
+• .setkota
 • .owner
+• .azan (Tes suara azan)
 `
         })
-      }
-      break
+      } break
 
       case "ping": await sock.sendMessage(from, { text: "🏓 *Pong!* Bot berjalan normal." }); break
       case "jadwalkuliah": await sock.sendMessage(from, { text: formatJadwal() }); break
+      case "jadwalon": jadwal.aktif = true; saveJadwal(); await sock.sendMessage(from, { text: "✅ Pengingat jadwal kuliah diaktifkan." }); break
+      case "jadwaloff": jadwal.aktif = false; saveJadwal(); await sock.sendMessage(from, { text: "❌ Pengingat jadwal kuliah dimatikan." }); break
 
-      // ==== EDIT JADWAL ====
-      case "editjadwal": {
-        if (!args.includes("|")) return sock.sendMessage(from, { text: "❌ Format salah!\nContoh: .editjadw>
-        const [hari, isi] = args.split("|").map(a => a.trim())
-        if (!jadwal.data[hari]) jadwal.data[hari] = []
-        jadwal.data[hari].push(isi)
-        saveJadwal()
-        await sock.sendMessage(from, { text: `✅ Jadwal *${hari}* ditambah:\n${isi}` })
-      } break
-
-      // ==== HAPUS JADWAL ====
-      case "hapusjadwal": {
-        if (!args.includes("|")) return sock.sendMessage(from, { text: "❌ Format salah!\nContoh: .hapusjad>
-        const [hari, nomor] = args.split("|").map(a => a.trim())
-        const index = parseInt(nomor) - 1
-        if (!jadwal.data[hari] || !jadwal.data[hari][index]) return sock.sendMessage(from, { text: `⚠️ Tidak>
-        const hapus = jadwal.data[hari].splice(index, 1)
-        saveJadwal()
-        await sock.sendMessage(from, { text: `🗑️ Jadwal "${hapus[0]}" di *${hari}* dihapus.` })
-      } break
-
-      // ==== AKTIF/MATIKAN PENGINGAT JADWAL ====
-      case "jadwalon": jadwal.aktif = true; saveJadwal(); await sock.sendMessage(from, { text: "✅ Penginga>
-      case "jadwaloff": jadwal.aktif = false; saveJadwal(); await sock.sendMessage(from, { text: "❌ Pengin>
-
-      // ==== FITUR TUGAS ====
       case "tugas": await sock.sendMessage(from, { text: formatTugas() }); break
-      case "tugason": tugas.aktif = true; saveTugas(); await sock.sendMessage(from, { text: "✅ Pengingat t>
-      case "tugasoff": tugas.aktif = false; saveTugas(); await sock.sendMessage(from, { text: "❌ Pengingat>
+      case "tugason": tugas.aktif = true; saveTugas(); await sock.sendMessage(from, { text: "✅ Pengingat tugas diaktifkan." }); break
+      case "tugasoff": tugas.aktif = false; saveTugas(); await sock.sendMessage(from, { text: "❌ Pengingat tugas dimatikan." }); break
 
-      case "tambahtugas": {
-        if (!args.includes("|")) return sock.sendMessage(from, { text: "❌ Format salah!\nContoh: .tambahtu>
-        const [nama, deadline] = args.split("|").map(a => a.trim())
-        tugas.data.push({ nama, deadline })
-        saveTugas()
-        await sock.sendMessage(from, { text: `✅ *Tugas disimpan!*\n📌 ${nama}\n⏳ Deadline: ${deadline}` })
-      } break
-
-      case "edittugas": {
-        if (!args.includes("|")) return sock.sendMessage(from, { text: "❌ Format salah!\nContoh: .edittuga>
-        const [nomor, nama, deadline] = args.split("|").map(a => a.trim())
-        const index = parseInt(nomor) - 1
-        if (!tugas.data[index]) return sock.sendMessage(from, { text: `⚠️ Tidak ada tugas nomor ${nomor}` })
-        tugas.data[index] = { nama, deadline }
-        saveTugas()
-        await sock.sendMessage(from, { text: `✏️ Tugas nomor ${nomor} berhasil diubah.` })
-      } break
-
-      case "hapustugas": {
-        if (!args) return sock.sendMessage(from, { text: "❌ Contoh: .hapustugas 1" })
-        const index = parseInt(args) - 1
-        if (!tugas.data[index]) return sock.sendMessage(from, { text: `⚠️ Tidak ada tugas nomor ${args}` })
-        const hapus = tugas.data.splice(index, 1)
-        saveTugas()
-        await sock.sendMessage(from, { text: `🗑️ Tugas "${hapus[0].nama}" dihapus.` })
-      } break
-
-// ==== SHOLAT ====
       case "shalat": {
         try {
-          const today = new Date().toISOString().slice(0, 10).replace(/-/g, "/")
-          const res = await fetch(`https://api.myquran.com/v1/sholat/jadwal/1101/${today}`)
+          const res = await fetch(`https://api.aladhan.com/v1/timingsByCity?city=${encodeURIComponent(config.kota)}&country=Indonesia&method=2`)
           const data = await res.json()
-          const j = data.data.jadwal
+          const j = data.data.timings
+          const tgl = data.data.date.readable
           await sock.sendMessage(from, {
-            text: `🕌 *JADWAL SHOLAT ACEH BARAT (MEULABOH)*
+            text: `🕌 *JADWAL SHOLAT ${config.kota.toUpperCase()}*
 
-📅 ${j.tanggal}
-🌅 Subuh     : ${j.subuh}
-🌤️ Dzuhur    : ${j.dzuhur}
-🌇 Ashar     : ${j.ashar}
-🌆 Maghrib   : ${j.maghrib}
-🌙 Isya      : ${j.isya}`
+📅 ${tgl}
+🌅 Subuh     : ${j.Fajr}
+🌤️ Dzuhur    : ${j.Dhuhr}
+🌇 Ashar     : ${j.Asr}
+🌆 Maghrib   : ${j.Maghrib}
+🌙 Isya      : ${j.Isha}`
           })
         } catch {
           await sock.sendMessage(from, { text: "⚠️ Gagal mengambil jadwal sholat." })
         }
       } break
 
-      // ==== OWNER ====
+      case "setkota": {
+        if (!args) return sock.sendMessage(from, { text: "⚠️ Contoh: .setkota Banda Aceh" })
+        config.kota = args
+        saveConfig()
+        await sock.sendMessage(from, { text: `✅ Kota sholat diubah ke *${args}*.` })
+      } break
+
+      case "azan": {
+        await sock.sendMessage(from, {
+          audio: { url: "./azan1.mp3" },
+          mimetype: "audio/mpeg",
+          ptt: false
+        })
+        await sock.sendMessage(from, { text: "📢 Memutar suara azan..." })
+      } break
+
       case "owner": await sock.sendMessage(from, { text: "👑 Owner: Gibran\nwa.me/6285121084070" }); break
     }
   })
 
-  // ====== PENGINGAT KULIAH JAM 21.00 WIB ======
-  cron.schedule("0 21 * * 0-6", () => {
-    if (!jadwal.aktif) return
-    const hariBesok = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"][(new Date().getDay()>
-    if (jadwal.data[hariBesok]) {
-      let teks = `📚 *JADWAL KULIAH BESOK (${hariBesok})*\n\n`
-      jadwal.data[hariBesok].forEach((j, i) => teks += `${i + 1}. ${j}\n`)
-      sock.sendMessage("6285121084070@s.whatsapp.net", { text: teks })
-    }
-  })
+  // ====== PENGINGAT SHOLAT OTOMATIS KE GRUP ======
+  const groupID = "120363422769491936@g.us" // ID grup kamu
 
-  // ====== PENGINGAT TUGAS 07.00 & 18.00 WIB ======
-  const remindTugas = () => {
-    if (!tugas.aktif || tugas.data.length === 0) return
-    let teks = "📖 *PENGINGAT TUGAS*\n\n"
-    tugas.data.forEach((t, i) => teks += `${i + 1}. ${t.nama}\n🕒 Deadline: ${t.deadline}\n\n`)
-    sock.sendMessage("6285121084070@s.whatsapp.net", { text: teks })
+  async function aturPengingatShalat() {
+    try {
+      const res = await fetch(`https://api.aladhan.com/v1/timingsByCity?city=${encodeURIComponent(config.kota)}&country=Indonesia&method=2`)
+      const data = await res.json()
+      const j = data.data.timings
+
+      const waktuList = {
+        Subuh: j.Fajr,
+        Dzuhur: j.Dhuhr,
+        Ashar: j.Asr,
+        Maghrib: j.Maghrib,
+        Isya: j.Isha
+      }
+
+      for (const [nama, waktu] of Object.entries(waktuList)) {
+        const [jam, menit] = waktu.split(":")
+        cron.schedule(`${menit} ${jam} * * *`, async () => {
+          await sock.sendMessage(groupID, { text: `🕌 *Sudah masuk waktu ${nama}!*` })
+          await sock.sendMessage(groupID, {
+            audio: { url: "./azan1.mp3" },
+            mimetype: "audio/mpeg",
+            ptt: false
+          })
+        })
+      }
+
+      console.log("✅ Jadwal pengingat shalat diatur.")
+    } catch (e) {
+      console.error("❌ Gagal mengatur pengingat shalat:", e)
+    }
   }
-  cron.schedule("0 7,18 * * *", remindTugas)
+
+  aturPengingatShalat()
+  cron.schedule("1 0 * * *", aturPengingatShalat)
 }
 
 startBot()
